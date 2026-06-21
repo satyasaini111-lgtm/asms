@@ -1,0 +1,139 @@
+name: ASMS CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ─── Test & Quality Gate ───────────────────────────────────────────────────
+  test:
+    name: Test & SonarQube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Tests & Coverage
+        run: mvn verify -P integration-tests --no-transfer-progress
+
+      - name: Publish Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: JUnit Tests
+          path: '**/target/surefire-reports/*.xml'
+          reporter: java-junit
+
+      - name: SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: mvn sonar:sonar
+             -Dsonar.projectKey=asms
+             -Dsonar.host.url=$SONAR_HOST_URL
+             -Dsonar.token=$SONAR_TOKEN
+             -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+
+  # ─── Build & Push to ECR ──────────────────────────────────────────────────
+  build-push:
+    name: Build & Push Docker Images
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        service: [api-gateway, user-service, support-service, visitor-service,
+                  payment-service, billing-service, amenity-service,
+                  notification-service, helpbot-service, workflow-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC — no long-lived keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Maven module
+        run: mvn package -pl ${{ matrix.service }} -am -DskipTests --no-transfer-progress
+
+      - name: Build & Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/asms/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}/asms/${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # ─── GitOps Update (ArgoCD) ──────────────────────────────────────────────
+  gitops-update:
+    name: Update GitOps Repo (ArgoCD)
+    needs: build-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write
+      contents: write
+    strategy:
+      matrix:
+        service: [api-gateway, user-service, support-service, visitor-service,
+                  payment-service, billing-service, amenity-service,
+                  notification-service, helpbot-service, workflow-service]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.GITOPS_REPO }}
+          token: ${{ secrets.GITOPS_TOKEN }}
+
+      - name: Install yq
+        run: |
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
+      - name: Update image tag in values-prod.yaml
+        run: |
+          yq e -i '.image.tag = "${{ env.IMAGE_TAG }}"' \
+            helm/${{ matrix.service }}/values-prod.yaml
+
+      - name: Commit and push
+        run: |
+          git config user.email "ci@asms.io"
+          git config user.name "ASMS CI"
+          git add helm/${{ matrix.service }}/values-prod.yaml
+          git commit -m "ci: update ${{ matrix.service }} to ${{ env.IMAGE_TAG }}" || exit 0
+          git push

@@ -1,0 +1,49 @@
+---
+# Zero-trust: all pods in asms-prod must use mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: asms-prod
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Payment service only callable from specific services
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: payment-service-policy
+  namespace: asms-prod
+spec:
+  selector:
+    matchLabels:
+      app: payment-service
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/asms-prod/sa/amenity-service"
+              - "cluster.local/ns/asms-prod/sa/billing-service"
+              - "cluster.local/ns/asms-prod/sa/api-gateway"
+
+---
+# Resilience: 3 retries with 2s per-try timeout for all services
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: asms-default-retry
+  namespace: asms-prod
+spec:
+  hosts:
+    - "*.asms-prod.svc.cluster.local"
+  http:
+    - retries:
+        attempts: 3
+        perTryTimeout: 2s
+        retryOn: gateway-error,connect-failure,refused-stream
+      timeout: 10s
+      route:
+        - destination:
+            host: "*.asms-prod.svc.cluster.local"

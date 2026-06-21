@@ -1,0 +1,25 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git:
+          uri: ${CONFIG_GIT_URI:file://./config-repo}
+          default-label: main
+          search-paths: "/{application}"
+        native:
+          search-locations: classpath:/config
+  security:
+    user:
+      name: ${CONFIG_SERVER_USER:config-admin}
+      password: ${CONFIG_SERVER_PASSWORD:config-secret}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh
