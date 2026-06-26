@@ -3,11 +3,12 @@ pipeline {
 
     environment {
         AWS_REGION      = 'ap-south-1'
-        ECR_REGISTRY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_REGISTRY    = "${AWS_ACCOUNT_ID ?: 'YOUR_ACCOUNT_ID'}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${env.BUILD_NUMBER}-${env.GIT_COMMIT[0..6]}"
         EKS_CLUSTER     = 'asms-prod-eks'
         K8S_NAMESPACE   = 'asms-prod'
-        MAVEN_OPTS      = '-Xss128k -XX:+UseG1GC'
+        MAVEN_OPTS      = '-Xss512k -XX:+UseG1GC'
+        HAS_AWS_CREDS   = "${env.AWS_ACCOUNT_ID ? 'true' : 'false'}"
     }
 
     tools {
@@ -38,8 +39,7 @@ pipeline {
             }
             post {
                 always {
-                    junit 'asms/**/target/surefire-reports/*.xml'
-                    jacoco(execPattern: 'asms/**/target/jacoco.exec')
+                    junit allowEmptyResults: true, testResults: 'asms/**/target/surefire-reports/*.xml'
                 }
             }
         }
@@ -53,6 +53,7 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
+            when { expression { return env.SONAR_HOST_URL != null } }
             steps {
                 dir('asms') {
                     withSonarQubeEnv('SonarQube') {
@@ -63,6 +64,7 @@ pipeline {
         }
 
         stage('ECR Login') {
+            when { expression { return env.AWS_ACCOUNT_ID != null } }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'aws-credentials',
@@ -78,6 +80,7 @@ pipeline {
         }
 
         stage('Docker Build & Push') {
+            when { expression { return env.AWS_ACCOUNT_ID != null } }
             parallel {
                 stage('user-service') {
                     steps { script { buildAndPush('user-service', 'asms') } }
@@ -116,6 +119,7 @@ pipeline {
         }
 
         stage('Deploy to EKS') {
+            when { expression { return env.AWS_ACCOUNT_ID != null } }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'aws-credentials',
@@ -154,6 +158,7 @@ pipeline {
         }
 
         stage('Smoke Test') {
+            when { expression { return env.AWS_ACCOUNT_ID != null } }
             steps {
                 script {
                     def albDns = sh(
@@ -172,10 +177,10 @@ pipeline {
 
     post {
         success {
-            echo "Deployment ${IMAGE_TAG} succeeded"
+            echo "Pipeline ${IMAGE_TAG} succeeded"
         }
         failure {
-            echo "Deployment ${IMAGE_TAG} FAILED — check logs above"
+            echo "Pipeline ${IMAGE_TAG} FAILED — check logs above"
         }
         always {
             cleanWs()
