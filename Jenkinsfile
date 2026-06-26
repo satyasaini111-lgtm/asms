@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION      = 'ap-south-1'
+        AWS_REGION      = 'us-east-1'
         ECR_REGISTRY    = "${AWS_ACCOUNT_ID ?: 'YOUR_ACCOUNT_ID'}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_TAG       = "${env.BUILD_NUMBER}-${env.GIT_COMMIT[0..6]}"
         EKS_CLUSTER     = 'asms-prod-eks'
