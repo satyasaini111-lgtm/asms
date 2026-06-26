@@ -177,7 +177,7 @@ pipeline {
             echo "Pipeline ${IMAGE_TAG} FAILED — check logs above"
         }
         always {
-            cleanWs()
+            deleteDir()
         }
     }
 }
