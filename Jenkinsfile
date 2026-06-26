@@ -77,37 +77,37 @@ pipeline {
             when { expression { return env.AWS_ACCOUNT_ID != null } }
             parallel {
                 stage('user-service') {
-                    steps { script { buildAndPush('user-service', 'asms') } }
+                    steps { script { buildAndPush('user-service', '.') } }
                 }
                 stage('support-service') {
-                    steps { script { buildAndPush('support-service', 'asms') } }
+                    steps { script { buildAndPush('support-service', '.') } }
                 }
                 stage('amenity-service') {
-                    steps { script { buildAndPush('amenity-service', 'asms') } }
+                    steps { script { buildAndPush('amenity-service', '.') } }
                 }
                 stage('visitor-service') {
-                    steps { script { buildAndPush('visitor-service', 'asms') } }
+                    steps { script { buildAndPush('visitor-service', '.') } }
                 }
                 stage('payment-service') {
-                    steps { script { buildAndPush('payment-service', 'asms') } }
+                    steps { script { buildAndPush('payment-service', '.') } }
                 }
                 stage('billing-service') {
-                    steps { script { buildAndPush('billing-service', 'asms') } }
+                    steps { script { buildAndPush('billing-service', '.') } }
                 }
                 stage('workflow-service') {
-                    steps { script { buildAndPush('workflow-service', 'asms') } }
+                    steps { script { buildAndPush('workflow-service', '.') } }
                 }
                 stage('notification-service') {
-                    steps { script { buildAndPush('notification-service', 'asms') } }
+                    steps { script { buildAndPush('notification-service', '.') } }
                 }
                 stage('helpbot-service') {
-                    steps { script { buildAndPush('helpbot-service', 'asms') } }
+                    steps { script { buildAndPush('helpbot-service', '.') } }
                 }
                 stage('api-gateway') {
-                    steps { script { buildAndPush('api-gateway', 'asms') } }
+                    steps { script { buildAndPush('api-gateway', '.') } }
                 }
                 stage('config-server') {
-                    steps { script { buildAndPush('config-server', 'asms') } }
+                    steps { script { buildAndPush('config-server', '.') } }
                 }
             }
         }
@@ -175,6 +175,7 @@ pipeline {
         }
         failure {
             echo "Pipeline ${IMAGE_TAG} FAILED — check logs above"
+
         }
         always {
             deleteDir()
