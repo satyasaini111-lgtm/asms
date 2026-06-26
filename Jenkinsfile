@@ -33,32 +33,26 @@ pipeline {
 
         stage('Unit Tests') {
             steps {
-                dir('asms') {
-                    sh 'mvn test --no-transfer-progress -pl user-service,support-service,payment-service,visitor-service'
-                }
+                sh 'mvn test --no-transfer-progress -pl user-service,support-service,payment-service,visitor-service'
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'asms/**/target/surefire-reports/*.xml'
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                 }
             }
         }
 
         stage('Build JARs') {
             steps {
-                dir('asms') {
-                    sh 'mvn package -DskipTests --no-transfer-progress'
-                }
+                sh 'mvn package -DskipTests --no-transfer-progress'
             }
         }
 
         stage('SonarQube Analysis') {
             when { expression { return env.SONAR_HOST_URL != null } }
             steps {
-                dir('asms') {
-                    withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar --no-transfer-progress -Dsonar.projectKey=asms'
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar --no-transfer-progress -Dsonar.projectKey=asms'
                 }
             }
         }
