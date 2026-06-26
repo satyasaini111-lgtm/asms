@@ -1,0 +1,5 @@
+package com.asms.workflow.domain;
+
+public enum WorkflowType {
+    VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING
+}

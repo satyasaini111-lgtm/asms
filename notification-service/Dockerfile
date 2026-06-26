@@ -1,14 +1,14 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY pom.xml .
-COPY support-service/pom.xml support-service/pom.xml
+COPY notification-service/pom.xml notification-service/pom.xml
 RUN mvn -N install -q
-COPY support-service/src support-service/src
-RUN mvn -f support-service/pom.xml package -DskipTests -q
+COPY notification-service/src notification-service/src
+RUN mvn -f notification-service/pom.xml package -DskipTests -q
 
 FROM eclipse-temurin:21-jre AS layers
 WORKDIR /app
-COPY --from=build /build/support-service/target/*.jar app.jar
+COPY --from=build /build/notification-service/target/*.jar app.jar
 RUN java -Djarmode=layertools -jar app.jar extract
 
 FROM eclipse-temurin:21-jre AS runtime
@@ -19,6 +19,6 @@ COPY --from=layers /app/spring-boot-loader/ ./
 COPY --from=layers /app/snapshot-dependencies/ ./
 COPY --from=layers /app/application/ ./
 USER asmsuser
-EXPOSE 8084
-HEALTHCHECK --interval=15s --timeout=5s --retries=3 CMD curl -sf http://localhost:8084/actuator/health || exit 1
+EXPOSE 8089
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 CMD curl -sf http://localhost:8089/actuator/health || exit 1
 ENTRYPOINT ["java", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-Xss128k", "-Djava.security.egd=file:/dev/./urandom", "org.springframework.boot.loader.launch.JarLauncher"]

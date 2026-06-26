@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asms-common-config
+  namespace: asms-prod
+data:
+  SPRING_DATA_MONGODB_URI: "mongodb://asms:asms-secret@mongodb:27017/asms?authSource=admin"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  SPRING_PROFILES_ACTIVE: "prod"
+  KEYCLOAK_ISSUER_URI: "http://keycloak:8080/realms/asms"
+  KEYCLOAK_JWK_URI: "http://keycloak:8080/realms/asms/protocol/openid-connect/certs"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  MANAGEMENT_METRICS_TAGS_APPLICATION: "asms"

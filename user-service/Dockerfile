@@ -1,26 +1,28 @@
-# Multi-stage build — layered Spring Boot image
-FROM eclipse-temurin:21-jre AS deps
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /build
+COPY pom.xml .
+COPY user-service/pom.xml user-service/pom.xml
+RUN mvn -N install -q
+COPY user-service/src user-service/src
+RUN mvn -f user-service/pom.xml package -DskipTests -q
+
+FROM eclipse-temurin:21-jre AS layers
 WORKDIR /app
-COPY target/*.jar app.jar
+COPY --from=build /build/user-service/target/*.jar app.jar
 RUN java -Djarmode=layertools -jar app.jar extract
 
 FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
-
 RUN groupadd --gid 10001 asmsgroup && \
     useradd --uid 10001 --gid asmsgroup --shell /bin/false asmsuser
-
-COPY --from=deps /app/dependencies/ ./
-COPY --from=deps /app/spring-boot-loader/ ./
-COPY --from=deps /app/snapshot-dependencies/ ./
-COPY --from=deps /app/application/ ./
-
+COPY --from=layers /app/dependencies/ ./
+COPY --from=layers /app/spring-boot-loader/ ./
+COPY --from=layers /app/snapshot-dependencies/ ./
+COPY --from=layers /app/application/ ./
 USER asmsuser
 EXPOSE 8081
-
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
   CMD curl -sf http://localhost:8081/actuator/health || exit 1
-
 ENTRYPOINT ["java", \
   "-XX:+UseG1GC", \
   "-XX:MaxGCPauseMillis=200", \
