@@ -1,5 +1,10 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
+# Inject corporate CA cert so Confluent Maven repo is reachable
+COPY corp-ca.pem /usr/local/share/ca-certificates/corp-ca.crt
+RUN update-ca-certificates && \
+    keytool -import -trustcacerts -alias corp-ca -noprompt -storepass changeit \
+      -keystore "$JAVA_HOME/lib/security/cacerts" -file /usr/local/share/ca-certificates/corp-ca.crt 2>/dev/null || true
 COPY pom.xml .
 COPY user-service/pom.xml user-service/pom.xml
 RUN mvn -N install -q
