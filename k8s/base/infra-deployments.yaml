@@ -15,6 +15,9 @@ spec:
       labels:
         app: mongodb
     spec:
+      volumes:
+        - name: mongo-data
+          emptyDir: {}
       containers:
         - name: mongodb
           image: mongo:7.0
@@ -46,14 +49,6 @@ spec:
               command: ["mongosh", "--eval", "db.adminCommand('ping')"]
             initialDelaySeconds: 20
             periodSeconds: 10
-  volumeClaimTemplates:
-    - metadata:
-        name: mongo-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 10Gi
 ---
 apiVersion: v1
 kind: Service

@@ -1,5 +1,5 @@
 variable "aws_region" {
-  default = "ap-south-1"
+  default = "us-east-1"
 }
 
 variable "project" {
@@ -23,11 +23,11 @@ variable "private_subnets" {
 }
 
 variable "availability_zones" {
-  default = ["ap-south-1a", "ap-south-1b"]
+  default = ["us-east-1a", "us-east-1b"]
 }
 
 variable "eks_version" {
-  default = "1.30"
+  default = "1.36"
 }
 
 variable "node_instance_type" {

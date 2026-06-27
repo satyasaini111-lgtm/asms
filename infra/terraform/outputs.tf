@@ -19,8 +19,4 @@ output "ecr_registry" {
   value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 }
 
-output "alb_controller_role_arn" {
-  value = aws_iam_role.alb_controller.arn
-}
-
 data "aws_caller_identity" "current" {}

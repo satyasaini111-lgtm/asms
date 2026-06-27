@@ -13,7 +13,7 @@ resource "aws_internet_gateway" "igw" {
   tags   = { Name = "${local.name_prefix}-igw" }
 }
 
-# ─── Public Subnets (ALB, NAT GW) ─────────────────────────────────────────────
+# ─── Public Subnets (ALB, worker nodes) ───────────────────────────────────────
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnets)
   vpc_id                  = aws_vpc.main.id
@@ -27,7 +27,7 @@ resource "aws_subnet" "public" {
   }
 }
 
-# ─── Private Subnets (EKS workers) ────────────────────────────────────────────
+# ─── Private Subnets (reserved for future use) ────────────────────────────────
 resource "aws_subnet" "private" {
   count             = length(var.private_subnets)
   vpc_id            = aws_vpc.main.id
@@ -38,21 +38,6 @@ resource "aws_subnet" "private" {
     Name                              = "${local.name_prefix}-private-${count.index + 1}"
     "kubernetes.io/role/internal-elb" = "1"
   }
-}
-
-# ─── NAT Gateway (one per AZ for HA) ──────────────────────────────────────────
-resource "aws_eip" "nat" {
-  count  = length(var.public_subnets)
-  domain = "vpc"
-  tags   = { Name = "${local.name_prefix}-nat-eip-${count.index + 1}" }
-}
-
-resource "aws_nat_gateway" "nat" {
-  count         = length(var.public_subnets)
-  allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = aws_subnet.public[count.index].id
-  tags          = { Name = "${local.name_prefix}-nat-${count.index + 1}" }
-  depends_on    = [aws_internet_gateway.igw]
 }
 
 # ─── Route Tables ──────────────────────────────────────────────────────────────
@@ -71,12 +56,25 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# ─── NAT Gateway (single AZ — cost-efficient for demo) ───────────────────────
+resource "aws_eip" "nat" {
+  domain = "vpc"
+  tags   = { Name = "${local.name_prefix}-nat-eip" }
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public[0].id
+  depends_on    = [aws_internet_gateway.igw]
+  tags          = { Name = "${local.name_prefix}-nat-gw" }
+}
+
 resource "aws_route_table" "private" {
   count  = length(var.private_subnets)
   vpc_id = aws_vpc.main.id
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat[count.index].id
+    nat_gateway_id = aws_nat_gateway.main.id
   }
   tags = { Name = "${local.name_prefix}-private-rt-${count.index + 1}" }
 }
