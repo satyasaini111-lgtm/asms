@@ -144,8 +144,8 @@ pipeline {
                         kubectl apply -f k8s/base/ingress.yaml
 
                         # Wait for rollout
-                        kubectl rollout status deployment/api-gateway -n ${K8S_NAMESPACE} --timeout=300s
-                        kubectl rollout status deployment/user-service -n ${K8S_NAMESPACE} --timeout=300s
+                        kubectl rollout status deployment/api-gateway -n ${K8S_NAMESPACE} --timeout=600s
+                        kubectl rollout status deployment/user-service -n ${K8S_NAMESPACE} --timeout=600s
                     """
                 }
             }
