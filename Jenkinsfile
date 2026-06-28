@@ -169,6 +169,11 @@ pipeline {
                         sed 's|\${ECR_REGISTRY}|'"${ECR_REGISTRY}"'|g' k8s/base/infra-deployments.yaml | \
                             kubectl apply -f -
 
+                        # EKS ignores StatefulSet maxUnavailable; force-delete pods so the
+                        # controller recreates them from updateRevision without the
+                        # maxUnavailable:0 deadlock (missing pod != unavailable pod)
+                        kubectl delete pod mongodb-0 kafka-0 -n ${K8S_NAMESPACE} --ignore-not-found=true || true
+
                         # Wait for MongoDB and Kafka to be ready before deploying services
                         # (domain service initContainers depend on these being reachable)
                         kubectl rollout status statefulset/mongodb -n ${K8S_NAMESPACE} --timeout=600s
