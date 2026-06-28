@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: helpbot-service
@@ -7,7 +7,7 @@ metadata:
     app: helpbot-service
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: helpbot-service
@@ -75,7 +75,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: helpbot-service
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 4
   metrics:
     - type: Resource

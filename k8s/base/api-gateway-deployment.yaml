@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-gateway
@@ -7,7 +7,7 @@ metadata:
     app: api-gateway
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   progressDeadlineSeconds: 900
   selector:
     matchLabels:
@@ -80,7 +80,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: api-gateway
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 8
   metrics:
     - type: Resource
