@@ -135,7 +135,7 @@ pipeline {
 
                         # Wait for MongoDB and Kafka to be ready before deploying services
                         # (domain service initContainers depend on these being reachable)
-                        kubectl rollout status statefulset/mongodb -n ${K8S_NAMESPACE} --timeout=300s
+                        kubectl rollout status statefulset/mongodb -n ${K8S_NAMESPACE} --timeout=600s
                         kubectl rollout status statefulset/kafka -n ${K8S_NAMESPACE} --timeout=300s
 
                         # Substitute image tags and apply all service deployments
@@ -159,15 +159,39 @@ pipeline {
         stage('Smoke Test') {
             when { expression { return env.AWS_ACCOUNT_ID != null } }
             steps {
-                script {
-                    def albDns = sh(
-                        script: "kubectl get ingress asms-ingress -n ${K8S_NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'",
-                        returnStdout: true
-                    ).trim()
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-credentials',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
                     sh """
-                        echo "ALB: ${albDns}"
-                        curl -sf http://${albDns}/api/v1/users/actuator/health || \
-                        curl -sf http://${albDns}/actuator/health
+                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER}
+
+                        # Wait up to 5 min for ALB to be provisioned by the AWS Load Balancer Controller
+                        albDns=''
+                        for i in \$(seq 1 20); do
+                            albDns=\$(kubectl get ingress asms-ingress -n ${K8S_NAMESPACE} \
+                                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+                            if [ -n "\$albDns" ]; then
+                                echo "ALB provisioned: \$albDns"
+                                break
+                            fi
+                            echo "Waiting for ALB hostname... attempt \$i/20"
+                            sleep 15
+                        done
+
+                        if [ -z "\$albDns" ]; then
+                            echo "ERROR: ALB not provisioned after 5 minutes"
+                            exit 1
+                        fi
+
+                        # Give ALB health checks 60s to pass before hitting it
+                        sleep 60
+
+                        curl -sf --retry 6 --retry-delay 15 --retry-connrefused \
+                            "http://\$albDns/api/v1/users/actuator/health" || \
+                        curl -sf --retry 6 --retry-delay 15 --retry-connrefused \
+                            "http://\$albDns/actuator/health"
                     """
                 }
             }
