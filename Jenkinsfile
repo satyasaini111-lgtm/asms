@@ -166,7 +166,7 @@ pipeline {
                         kubectl apply -f k8s/base/secrets.yaml
 
                         # Apply infra pods (substitute ECR_REGISTRY placeholder)
-                        sed "s|\${ECR_REGISTRY}|${ECR_REGISTRY}|g" k8s/base/infra-deployments.yaml | \
+                        sed 's|\${ECR_REGISTRY}|'"${ECR_REGISTRY}"'|g' k8s/base/infra-deployments.yaml | \
                             kubectl apply -f -
 
                         # Wait for MongoDB and Kafka to be ready before deploying services
