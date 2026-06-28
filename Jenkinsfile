@@ -186,7 +186,8 @@ pipeline {
                             kubectl apply -f -
                         done
 
-                        # Apply ingress
+                        # Apply IngressClass (EKS Auto Mode ALB) and ingress
+                        kubectl apply -f k8s/base/ingressclass.yaml
                         kubectl apply -f k8s/base/ingress.yaml
 
                         # Wait for rollout

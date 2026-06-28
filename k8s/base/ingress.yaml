@@ -4,7 +4,6 @@ metadata:
   name: asms-ingress
   namespace: asms-prod
   annotations:
-    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
@@ -13,6 +12,7 @@ metadata:
     alb.ingress.kubernetes.io/success-codes: "200,404"
     alb.ingress.kubernetes.io/group.name: asms-alb
 spec:
+  ingressClassName: alb
   rules:
     - http:
         paths:
