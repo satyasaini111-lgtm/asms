@@ -73,6 +73,41 @@ pipeline {
             }
         }
 
+        stage('Mirror Infra Images') {
+            when { expression { return env.AWS_ACCOUNT_ID != null } }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-credentials',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh """
+                        # Create ECR repos for third-party infra images (idempotent)
+                        for repo in asms/mongodb asms/redis asms/kafka asms/keycloak asms/busybox; do
+                            aws ecr create-repository --repository-name \$repo \
+                                --region ${AWS_REGION} 2>/dev/null || true
+                        done
+
+                        mirror_image() {
+                            local src="\$1" repo="\$2" tag="\$3"
+                            aws ecr describe-images --repository-name "\$repo" \
+                                --image-ids imageTag="\$tag" \
+                                --region ${AWS_REGION} >/dev/null 2>&1 && return 0
+                            docker pull "\$src"
+                            docker tag "\$src" "${ECR_REGISTRY}/\$repo:\$tag"
+                            docker push "${ECR_REGISTRY}/\$repo:\$tag"
+                        }
+
+                        mirror_image mongo:7.0                         asms/mongodb  7.0
+                        mirror_image redis:7.2-alpine                  asms/redis    7.2-alpine
+                        mirror_image confluentinc/cp-kafka:7.6.1       asms/kafka    7.6.1
+                        mirror_image quay.io/keycloak/keycloak:24.0.5  asms/keycloak 24.0.5
+                        mirror_image busybox:1.36                      asms/busybox  1.36
+                    """
+                }
+            }
+        }
+
         stage('Docker Build & Push') {
             when { expression { return env.AWS_ACCOUNT_ID != null } }
             parallel {
@@ -130,8 +165,9 @@ pipeline {
                         kubectl apply -f k8s/base/configmap.yaml
                         kubectl apply -f k8s/base/secrets.yaml
 
-                        # Apply infra pods
-                        kubectl apply -f k8s/base/infra-deployments.yaml
+                        # Apply infra pods (substitute ECR_REGISTRY placeholder)
+                        sed "s|\${ECR_REGISTRY}|${ECR_REGISTRY}|g" k8s/base/infra-deployments.yaml | \
+                            kubectl apply -f -
 
                         # Wait for MongoDB and Kafka to be ready before deploying services
                         # (domain service initContainers depend on these being reachable)
