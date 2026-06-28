@@ -8,6 +8,7 @@ metadata:
     version: v1
 spec:
   replicas: 2
+  progressDeadlineSeconds: 900
   selector:
     matchLabels:
       app: payment-service

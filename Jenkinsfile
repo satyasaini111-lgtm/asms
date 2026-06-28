@@ -133,6 +133,11 @@ pipeline {
                         # Apply infra pods
                         kubectl apply -f k8s/base/infra-deployments.yaml
 
+                        # Wait for MongoDB and Kafka to be ready before deploying services
+                        # (domain service initContainers depend on these being reachable)
+                        kubectl rollout status statefulset/mongodb -n ${K8S_NAMESPACE} --timeout=300s
+                        kubectl rollout status statefulset/kafka -n ${K8S_NAMESPACE} --timeout=300s
+
                         # Substitute image tags and apply all service deployments
                         for f in k8s/base/*-deployment.yaml; do
                             sed -e 's|\${ECR_REGISTRY}|${ECR_REGISTRY}|g' \
