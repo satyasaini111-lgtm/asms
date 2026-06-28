@@ -230,6 +230,10 @@ spec:
                 secretKeyRef:
                   name: asms-secrets
                   key: KEYCLOAK_ADMIN_PASSWORD
+            - name: KC_HOSTNAME
+              value: "keycloak"
+            - name: KC_HOSTNAME_PORT
+              value: "8080"
             - name: KC_HOSTNAME_STRICT
               value: "false"
             - name: KC_HTTP_ENABLED

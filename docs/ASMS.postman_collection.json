@@ -2,7 +2,7 @@
   "info": {
     "name": "ASMS - Apartment Service Management System",
     "_postman_id": "asms-api-collection-v1",
-    "description": "Complete API collection for the ASMS microservices platform.\n\n## Base URL\nSet the `baseUrl` variable to your ALB or local gateway URL.\nDefault: `http://k8s-asmsprod-asmsingr-7dc3e4d184-282727532.us-east-1.elb.amazonaws.com`\n\n## Getting a Token\nBecause Keycloak is internal-only, you must get the JWT token from inside the cluster:\n\n```bash\nkubectl exec -n asms-prod deployment/user-service -- sh -c \\\n  'wget -qO- --post-data \"client_id=asms-client&username=testuser&password=Test@1234&grant_type=password\" \\\n  http://keycloak:8080/realms/asms/protocol/openid-connect/token' | \\\n  python3 -c \"import sys,json; print(json.load(sys.stdin)[\\'access_token\\'])\"\n```\n\nPaste the token into the `token` collection variable before running requests.\n\n## Roles\n- `ADMIN` / `RWA_MEMBER` — management endpoints (list users, manage tickets, etc.)\n- `OWNER` / `TENANT` — resident actions (raise ticket, make payment, approve visitor)\n- `SECURITY` — log and control visitor entry\n- `SUPPORT_STAFF` — resolve support tickets\n- `VENDOR` — vendor operations\n\n## Enum Values\n**UserRole:** ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF\n**AmenityType:** SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER\n**TicketCategory:** PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\n**TicketPriority:** P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW\n**PaymentMethod:** UPI, CARD, NET_BANKING, WALLET, CASH\n**InvoiceType:** MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\n**WorkflowType:** VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING",
+    "description": "Complete API collection for the ASMS microservices platform.\n\n## Base URL\nSet the `baseUrl` variable to your ALB URL.\nDefault: `http://k8s-asmsprod-asmsingr-7dc3e4d184-282727532.us-east-1.elb.amazonaws.com`\n\n## Getting a Token\nRun **00 - Auth → Get Token** directly in Postman. Keycloak is exposed through the ALB at `/realms/*`.\n\nThe token is auto-saved to `{{token}}` by the test script — no kubectl needed.\n\nAvailable test users (all password `Test@1234`):\n- `testuser` — ADMIN\n- `rwa.member` — RWA_MEMBER\n- `resident` — OWNER\n- `security.guard` — SECURITY\n\n## Roles\n- `ADMIN` / `RWA_MEMBER` — management endpoints (list users, manage tickets, etc.)\n- `OWNER` / `TENANT` — resident actions (raise ticket, make payment, approve visitor)\n- `SECURITY` — log and control visitor entry\n- `SUPPORT_STAFF` — resolve support tickets\n- `VENDOR` — vendor operations\n\n## Enum Values\n**UserRole:** ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF\n**AmenityType:** SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER\n**TicketCategory:** PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\n**TicketPriority:** P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW\n**PaymentMethod:** UPI, CARD, NET_BANKING, WALLET, CASH\n**InvoiceType:** MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\n**WorkflowType:** VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -87,7 +87,7 @@
       "description": "Keycloak token operations. Token must be obtained via kubectl exec since Keycloak is not exposed externally.",
       "item": [
         {
-          "name": "Get Token (port-forward only)",
+          "name": "Get Token",
           "event": [
             {
               "listen": "test",
@@ -121,13 +121,11 @@
               ]
             },
             "url": {
-              "raw": "http://localhost:9090/realms/asms/protocol/openid-connect/token",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "9090",
+              "raw": "{{baseUrl}}/realms/asms/protocol/openid-connect/token",
+              "host": ["{{baseUrl}}"],
               "path": ["realms", "asms", "protocol", "openid-connect", "token"]
             },
-            "description": "Requires port-forward FIRST:\n```\nkubectl port-forward svc/keycloak -n asms-prod 9090:8080\n```\n\nWARNING: Token issued this way will have iss=http://localhost:9090/realms/asms which will be REJECTED by the api-gateway (it expects iss=http://keycloak:8080/realms/asms).\n\nFor production testing use the kubectl exec method in the collection description."
+            "description": "Keycloak is exposed through the ALB at /realms/*.\n\nThe token is auto-saved to {{token}} by the test script.\n\nSwitch username to test different roles:\n- testuser / Test@1234  → ADMIN\n- rwa.member / Test@1234 → RWA_MEMBER\n- resident / Test@1234  → OWNER\n- security.guard / Test@1234 → SECURITY"
           }
         }
       ]

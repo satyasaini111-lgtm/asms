@@ -16,7 +16,15 @@ spec:
   rules:
     - http:
         paths:
-          # All traffic goes through the API Gateway
+          # Keycloak — direct (bypasses API Gateway; no JWT auth on auth endpoints)
+          - path: /realms
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080
+          # All other traffic goes through the API Gateway
           - path: /api/v1/users
             pathType: Prefix
             backend:
