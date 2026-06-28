@@ -294,26 +294,30 @@ def buildAndPush(String service) {
 
     if (!forceAll && !changed.contains("${service}/")) {
         echo "Skipping ${service} — no source changes detected; re-tagging latest"
-        sh """
-            # Re-tag existing latest image with new build tag so deployment YAML resolves
-            MANIFEST=\$(aws ecr batch-get-image \
-                --repository-name asms/${service} \
-                --image-ids imageTag=latest \
-                --region ${AWS_REGION} \
-                --query 'images[0].imageManifest' --output text 2>/dev/null || true)
-            if [ -n "\$MANIFEST" ] && [ "\$MANIFEST" != "None" ]; then
+        def retagOk = false
+        withCredentials([usernamePassword(
+            credentialsId: 'aws-credentials',
+            usernameVariable: 'AWS_ACCESS_KEY_ID',
+            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+        )]) {
+            def status = sh(returnStatus: true, script: """
+                MANIFEST=\$(aws ecr batch-get-image \
+                    --repository-name asms/${service} \
+                    --image-ids imageTag=latest \
+                    --region ${AWS_REGION} \
+                    --query 'images[0].imageManifest' --output text 2>/dev/null || true)
+                [ -n "\$MANIFEST" ] && [ "\$MANIFEST" != "None" ] || exit 1
                 aws ecr put-image \
                     --repository-name asms/${service} \
                     --image-tag ${IMAGE_TAG} \
                     --image-manifest "\$MANIFEST" \
                     --region ${AWS_REGION} 2>/dev/null || true
-                echo "Re-tagged asms/${service}:latest → ${IMAGE_TAG}"
-            else
-                echo "No existing image found for ${service}, forcing full build"
-                _doBuild('${service}')
-            fi
-        """
-        return
+                echo "Re-tagged asms/${service}:latest to ${IMAGE_TAG}"
+            """)
+            retagOk = (status == 0)
+        }
+        if (retagOk) { return }
+        echo "No latest image for ${service} — running full build"
     }
 
     _doBuild(service)
