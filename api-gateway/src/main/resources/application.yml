@@ -19,31 +19,35 @@ spring:
         - RemoveResponseHeader=Server
       routes:
         - id: user-service
-          uri: lb://user-service
+          uri: http://user-service:8081
           predicates:
             - Path=/api/v1/users/**
         - id: amenity-service
-          uri: lb://amenity-service
+          uri: http://amenity-service:8083
           predicates:
             - Path=/api/v1/amenities/**,/api/v1/bookings/**
         - id: support-service
-          uri: lb://support-service
+          uri: http://support-service:8084
           predicates:
             - Path=/api/v1/tickets/**
         - id: visitor-service
-          uri: lb://visitor-service
+          uri: http://visitor-service:8085
           predicates:
             - Path=/api/v1/visitors/**
         - id: payment-service
-          uri: lb://payment-service
+          uri: http://payment-service:8086
           predicates:
             - Path=/api/v1/payments/**
         - id: billing-service
-          uri: lb://billing-service
+          uri: http://billing-service:8087
           predicates:
             - Path=/api/v1/invoices/**
+        - id: workflow-service
+          uri: http://workflow-service:8088
+          predicates:
+            - Path=/api/v1/workflows/**
         - id: helpbot-service
-          uri: lb://helpbot-service
+          uri: http://helpbot-service:8090
           predicates:
             - Path=/api/v1/helpbot/**
   data:
