@@ -12,9 +12,13 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class UserContextFilter implements GlobalFilter, Ordered {
+
+    private static final Set<String> ASMS_ROLES = Set.of(
+            "ADMIN", "RWA_MEMBER", "OWNER", "TENANT", "VENDOR", "SECURITY", "SUPPORT_STAFF");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -41,7 +45,11 @@ public class UserContextFilter implements GlobalFilter, Ordered {
         @SuppressWarnings("unchecked")
         List<String> roles = (List<String>) realmAccess.get("roles");
         if (roles == null || roles.isEmpty()) return "UNKNOWN";
-        return roles.get(0);
+        // Pick first ASMS-specific role; Keycloak injects default roles first
+        return roles.stream()
+                .filter(ASMS_ROLES::contains)
+                .findFirst()
+                .orElse("UNKNOWN");
     }
 
     @Override

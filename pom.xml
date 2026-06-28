@@ -33,7 +33,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Core -->
-        <spring-boot.version>3.3.4</spring-boot.version>
+
+        <spring-boot.version>3.3.11</spring-boot.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
 
         <!-- Data -->

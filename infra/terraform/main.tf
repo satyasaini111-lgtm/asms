@@ -16,7 +16,7 @@ terraform {
   backend "s3" {
     bucket         = "asms-terraform-state-prod"
     key            = "asms/prod/terraform.tfstate"
-    region         = "ap-south-1"
+    region         = "us-east-1"
     dynamodb_table = "asms-terraform-locks"
     encrypt        = true
   }
