@@ -7,6 +7,10 @@ metadata:
 spec:
   serviceName: mongodb
   replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: mongodb
@@ -122,6 +126,10 @@ metadata:
 spec:
   serviceName: kafka
   replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: kafka
