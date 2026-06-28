@@ -1,0 +1,957 @@
+{
+  "info": {
+    "name": "ASMS - Apartment Service Management System",
+    "_postman_id": "asms-api-collection-v1",
+    "description": "Complete API collection for the ASMS microservices platform.\n\n## Base URL\nSet the `baseUrl` variable to your ALB or local gateway URL.\nDefault: `http://k8s-asmsprod-asmsingr-7dc3e4d184-282727532.us-east-1.elb.amazonaws.com`\n\n## Getting a Token\nBecause Keycloak is internal-only, you must get the JWT token from inside the cluster:\n\n```bash\nkubectl exec -n asms-prod deployment/user-service -- sh -c \\\n  'wget -qO- --post-data \"client_id=asms-client&username=testuser&password=Test@1234&grant_type=password\" \\\n  http://keycloak:8080/realms/asms/protocol/openid-connect/token' | \\\n  python3 -c \"import sys,json; print(json.load(sys.stdin)[\\'access_token\\'])\"\n```\n\nPaste the token into the `token` collection variable before running requests.\n\n## Roles\n- `ADMIN` / `RWA_MEMBER` — management endpoints (list users, manage tickets, etc.)\n- `OWNER` / `TENANT` — resident actions (raise ticket, make payment, approve visitor)\n- `SECURITY` — log and control visitor entry\n- `SUPPORT_STAFF` — resolve support tickets\n- `VENDOR` — vendor operations\n\n## Enum Values\n**UserRole:** ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF\n**AmenityType:** SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER\n**TicketCategory:** PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\n**TicketPriority:** P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW\n**PaymentMethod:** UPI, CARD, NET_BANKING, WALLET, CASH\n**InvoiceType:** MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\n**WorkflowType:** VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://k8s-asmsprod-asmsingr-7dc3e4d184-282727532.us-east-1.elb.amazonaws.com",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT Bearer token from Keycloak. Obtain via kubectl exec (see collection description)."
+    },
+    {
+      "key": "societyId",
+      "value": "SOCIETY-001",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Create User response script"
+    },
+    {
+      "key": "amenityId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Create Amenity response script"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Create Booking response script"
+    },
+    {
+      "key": "ticketId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Create Ticket response script"
+    },
+    {
+      "key": "visitorId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Log Visitor Entry response script"
+    },
+    {
+      "key": "paymentId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Initiate Payment response script"
+    },
+    {
+      "key": "invoiceId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Generate Invoice response script"
+    },
+    {
+      "key": "workflowId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically by Submit Approval response script"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Auth",
+      "description": "Keycloak token operations. Token must be obtained via kubectl exec since Keycloak is not exposed externally.",
+      "item": [
+        {
+          "name": "Get Token (port-forward only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('token', json.access_token);",
+                  "    console.log('Token saved. Expires in:', json.expires_in, 'seconds');",
+                  "} else {",
+                  "    console.error('No access_token in response:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "client_id",  "value": "asms-client",    "type": "text" },
+                { "key": "username",   "value": "testuser",        "type": "text" },
+                { "key": "password",   "value": "Test@1234",       "type": "text" },
+                { "key": "grant_type", "value": "password",        "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:9090/realms/asms/protocol/openid-connect/token",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "9090",
+              "path": ["realms", "asms", "protocol", "openid-connect", "token"]
+            },
+            "description": "Requires port-forward FIRST:\n```\nkubectl port-forward svc/keycloak -n asms-prod 9090:8080\n```\n\nWARNING: Token issued this way will have iss=http://localhost:9090/realms/asms which will be REJECTED by the api-gateway (it expects iss=http://keycloak:8080/realms/asms).\n\nFor production testing use the kubectl exec method in the collection description."
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Users",
+      "description": "User registration and management. POST (create) has no auth. All GET/PATCH/DELETE require a valid JWT.",
+      "item": [
+        {
+          "name": "Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('userId', json.id);",
+                  "    pm.test('User created', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"email\": \"john.doe@asms.com\",\n  \"phone\": \"9876543210\",\n  \"role\": \"OWNER\",\n  \"societyId\": \"{{societyId}}\",\n  \"unitId\": \"A-101\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            },
+            "description": "No auth required. Valid roles: ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF"
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "Requires any authenticated role."
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users?societyId={{societyId}}&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"],
+              "query": [
+                { "key": "societyId", "value": "{{societyId}}" },
+                { "key": "role",   "value": "OWNER",   "disabled": true },
+                { "key": "status", "value": "ACTIVE",  "disabled": true },
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "20" }
+              ]
+            },
+            "description": "Requires ADMIN or RWA_MEMBER role."
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Smith\",\n  \"phone\": \"9876543211\",\n  \"unitId\": \"A-102\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "ADMIN/RWA_MEMBER can update any user. A user can update themselves (id matches authentication.name)."
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "Requires ADMIN role. GDPR erasure — permanently removes user data."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Amenities",
+      "description": "Amenity and booking management (swimming pool, gym, clubhouse, etc.)",
+      "item": [
+        {
+          "name": "Create Amenity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('amenityId', json.id);",
+                  "    pm.test('Amenity created', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"societyId\": \"{{societyId}}\",\n  \"name\": \"Swimming Pool\",\n  \"type\": \"SWIMMING_POOL\",\n  \"capacity\": 30,\n  \"hourlyRate\": 200.00,\n  \"description\": \"Olympic-size pool on the terrace level\",\n  \"operatingHours\": \"06:00-22:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/amenities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "amenities"]
+            },
+            "description": "AmenityType enum: SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER"
+          }
+        },
+        {
+          "name": "Get Amenity by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/amenities/{{amenityId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "amenities", "{{amenityId}}"]
+            }
+          }
+        },
+        {
+          "name": "List Amenities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/amenities?societyId={{societyId}}&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "amenities"],
+              "query": [
+                { "key": "societyId", "value": "{{societyId}}" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Amenity",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"societyId\": \"{{societyId}}\",\n  \"name\": \"Swimming Pool\",\n  \"type\": \"SWIMMING_POOL\",\n  \"capacity\": 40,\n  \"hourlyRate\": 250.00,\n  \"description\": \"Updated capacity\",\n  \"operatingHours\": \"05:30-23:00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/amenities/{{amenityId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "amenities", "{{amenityId}}"]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Amenity",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/amenities/{{amenityId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "amenities", "{{amenityId}}"]
+            },
+            "description": "Soft-deactivates the amenity (does not hard-delete)."
+          }
+        },
+        {
+          "name": "Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('bookingId', json.id);",
+                  "    pm.test('Booking created', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amenityId\": \"{{amenityId}}\",\n  \"userId\": \"{{userId}}\",\n  \"societyId\": \"{{societyId}}\",\n  \"slotStart\": \"2026-07-01T08:00:00Z\",\n  \"slotEnd\": \"2026-07-01T10:00:00Z\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings"]
+            },
+            "description": "slotStart and slotEnd must be ISO-8601 Instant (UTC). Overlapping slots return 409 Conflict."
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}"]
+            }
+          }
+        },
+        {
+          "name": "List Bookings by User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings?userId={{userId}}&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings"],
+              "query": [
+                { "key": "userId", "value": "{{userId}}" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}"]
+            },
+            "description": "Returns the booking with status CANCELLED."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Support Tickets",
+      "description": "Support ticket lifecycle: raise → assign → resolve → close",
+      "item": [
+        {
+          "name": "Create Ticket",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('ticketId', json.id);",
+                  "    pm.test('Ticket created', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Water leakage in bathroom\",\n  \"description\": \"There is a water leakage from the ceiling in the master bedroom bathroom. It has been ongoing for 3 days.\",\n  \"category\": \"PLUMBING\",\n  \"priority\": \"P2_HIGH\",\n  \"societyId\": \"{{societyId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"]
+            },
+            "description": "Requires OWNER or TENANT role.\nCategory: PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\nPriority: P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW"
+          }
+        },
+        {
+          "name": "Get Ticket by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}"]
+            },
+            "description": "Requires ADMIN, RWA_MEMBER, SUPPORT_STAFF, OWNER, or TENANT role."
+          }
+        },
+        {
+          "name": "List Tickets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets?societyId={{societyId}}&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets"],
+              "query": [
+                { "key": "societyId", "value": "{{societyId}}" },
+                { "key": "status", "value": "OPEN", "disabled": true },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Requires ADMIN, RWA_MEMBER, SUPPORT_STAFF, OWNER, or TENANT role. Results are filtered by role."
+          }
+        },
+        {
+          "name": "Assign Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/assign?assignedToUserId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "assign"],
+              "query": [
+                { "key": "assignedToUserId", "value": "{{userId}}" }
+              ]
+            },
+            "description": "Requires ADMIN or RWA_MEMBER role. Assigns ticket to a SUPPORT_STAFF user."
+          }
+        },
+        {
+          "name": "Resolve Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/resolve?resolutionNote=Plumber fixed the pipe. Issue resolved.",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "resolve"],
+              "query": [
+                { "key": "resolutionNote", "value": "Plumber fixed the pipe. Issue resolved." }
+              ]
+            },
+            "description": "Requires ADMIN, RWA_MEMBER, or SUPPORT_STAFF role."
+          }
+        },
+        {
+          "name": "Close Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketId}}/close",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tickets", "{{ticketId}}", "close"]
+            },
+            "description": "Requires ADMIN or RWA_MEMBER role. Ticket must be in RESOLVED state first."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Visitors",
+      "description": "Visitor entry lifecycle: log → approve/reject (resident) → check-in → check-out (security)",
+      "item": [
+        {
+          "name": "Log Visitor Entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('visitorId', json.id);",
+                  "    pm.test('Visitor logged', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visitorName\": \"Ravi Kumar\",\n  \"visitorPhone\": \"9123456789\",\n  \"vehicleNumber\": \"MH12AB1234\",\n  \"purpose\": \"Delivery\",\n  \"societyId\": \"{{societyId}}\",\n  \"residentUserId\": \"{{userId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitors",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visitors"]
+            },
+            "description": "Requires SECURITY role. Security guard logs the visitor at the gate."
+          }
+        },
+        {
+          "name": "Approve Visitor",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitors/{{visitorId}}/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visitors", "{{visitorId}}", "approve"]
+            },
+            "description": "Requires OWNER or TENANT role. Resident approves the visitor entry."
+          }
+        },
+        {
+          "name": "Reject Visitor",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitors/{{visitorId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visitors", "{{visitorId}}", "reject"]
+            },
+            "description": "Requires OWNER or TENANT role. Resident rejects the visitor entry."
+          }
+        },
+        {
+          "name": "Check In Visitor",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitors/{{visitorId}}/checkin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visitors", "{{visitorId}}", "checkin"]
+            },
+            "description": "Requires SECURITY role. Must be APPROVED first."
+          }
+        },
+        {
+          "name": "Check Out Visitor",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitors/{{visitorId}}/checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visitors", "{{visitorId}}", "checkout"]
+            },
+            "description": "Requires SECURITY role. Records visitor departure time."
+          }
+        },
+        {
+          "name": "List Visitors by Society",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visitors?societyId={{societyId}}&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visitors"],
+              "query": [
+                { "key": "societyId", "value": "{{societyId}}" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Requires ADMIN, RWA_MEMBER, or SECURITY role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Payments",
+      "description": "Payment processing — UPI, Card, Net Banking, Wallet, Cash",
+      "item": [
+        {
+          "name": "Initiate Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('paymentId', json.id);",
+                  "    pm.test('Payment initiated', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 2500.00,\n  \"method\": \"UPI\",\n  \"societyId\": \"{{societyId}}\",\n  \"referenceId\": \"{{invoiceId}}\",\n  \"referenceType\": \"INVOICE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments"]
+            },
+            "description": "Requires OWNER or TENANT role.\nPaymentMethod: UPI, CARD, NET_BANKING, WALLET, CASH\nreferenceType examples: INVOICE, AMENITY_BOOKING"
+          }
+        },
+        {
+          "name": "Get Payment by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}"]
+            },
+            "description": "Requires ADMIN, RWA_MEMBER, OWNER, or TENANT role."
+          }
+        },
+        {
+          "name": "My Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/my?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "my"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Requires OWNER or TENANT role. Returns payments for the authenticated user (X-User-Id header injected by gateway)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Billing",
+      "description": "Invoice generation and management for maintenance charges, parking, amenities, etc.",
+      "item": [
+        {
+          "name": "Generate Invoice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('invoiceId', json.id);",
+                  "    pm.test('Invoice generated', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"societyId\": \"{{societyId}}\",\n  \"userId\": \"{{userId}}\",\n  \"unitId\": \"A-101\",\n  \"type\": \"MONTHLY_MAINTENANCE\",\n  \"billingPeriod\": \"2026-07\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices", "generate"]
+            },
+            "description": "InvoiceType: MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\nbillingPeriod format: YYYY-MM (e.g., 2026-07)"
+          }
+        },
+        {
+          "name": "Get Invoice by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/{{invoiceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices", "{{invoiceId}}"]
+            }
+          }
+        },
+        {
+          "name": "List Invoices by User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/user/{{userId}}?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices", "user", "{{userId}}"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Invoices by Society",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/society/{{societyId}}?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices", "society", "{{societyId}}"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Invoice Paid",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/{{invoiceId}}/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices", "{{invoiceId}}", "pay"]
+            },
+            "description": "Marks the invoice as PAID. Typically triggered after a successful payment."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Workflows",
+      "description": "Multi-stage approval workflows using Chain of Responsibility pattern",
+      "item": [
+        {
+          "name": "Submit Approval Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.id) pm.collectionVariables.set('workflowId', json.id);",
+                  "    pm.test('Workflow submitted', () => pm.response.to.have.status(201));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requesterId\": \"{{userId}}\",\n  \"societyId\": \"{{societyId}}\",\n  \"workflowType\": \"MAINTENANCE_REQUEST\",\n  \"documentType\": \"WORK_ORDER\",\n  \"description\": \"Replacement of water pump in Block A\",\n  \"metadata\": {\n    \"estimatedCost\": 15000,\n    \"vendorId\": \"VENDOR-001\",\n    \"urgency\": \"HIGH\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workflows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workflows"]
+            },
+            "description": "WorkflowType: VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING\nProcessed through Chain of Responsibility: Security → RWA → Admin"
+          }
+        },
+        {
+          "name": "Get Approval by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workflows", "{{workflowId}}"]
+            }
+          }
+        },
+        {
+          "name": "List Workflows by Requester",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workflows/requester/{{userId}}?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workflows", "requester", "{{userId}}"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Workflows by Society",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workflows/society/{{societyId}}?status=PENDING&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workflows", "society", "{{societyId}}"],
+              "query": [
+                { "key": "status", "value": "PENDING" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "ApprovalStatus: PENDING, APPROVED, REJECTED"
+          }
+        },
+        {
+          "name": "Process (Approve) Workflow",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workflows", "{{workflowId}}", "process"]
+            },
+            "description": "Advances the workflow through the approval chain (Security → RWA → Admin). Call multiple times to progress through stages."
+          }
+        },
+        {
+          "name": "Reject Workflow",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/reject?reason=Budget%20not%20approved%20for%20Q3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workflows", "{{workflowId}}", "reject"],
+              "query": [
+                { "key": "reason", "value": "Budget not approved for Q3" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - HelpBot",
+      "description": "Rule-based FAQ assistant. No authentication required.",
+      "item": [
+        {
+          "name": "Ask Question (GET)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/helpbot/ask?query=How do I raise a maintenance request?",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "helpbot", "ask"],
+              "query": [
+                { "key": "query", "value": "How do I raise a maintenance request?" }
+              ]
+            },
+            "description": "Try: 'How do I pay maintenance?', 'What amenities are available?', 'How to register a visitor?'"
+          }
+        },
+        {
+          "name": "Ask Question (POST)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What are the gym timings?\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/helpbot/ask",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "helpbot", "ask"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
