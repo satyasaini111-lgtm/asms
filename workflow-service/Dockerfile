@@ -21,4 +21,4 @@ COPY --from=layers /app/application/ ./
 USER asmsuser
 EXPOSE 8088
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 CMD curl -sf http://localhost:8088/actuator/health || exit 1
-ENTRYPOINT ["java", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-Xss128k", "-Djava.security.egd=file:/dev/./urandom", "org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["java", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-Xss512k", "-Djava.security.egd=file:/dev/./urandom", "org.springframework.boot.loader.launch.JarLauncher"]

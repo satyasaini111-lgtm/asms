@@ -31,6 +31,6 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
 ENTRYPOINT ["java", \
   "-XX:+UseG1GC", \
   "-XX:MaxGCPauseMillis=200", \
-  "-Xss128k", \
+  "-Xss512k", \
   "-Djava.security.egd=file:/dev/./urandom", \
   "org.springframework.boot.loader.launch.JarLauncher"]
