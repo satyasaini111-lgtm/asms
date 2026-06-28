@@ -209,10 +209,14 @@ spec:
       labels:
         app: keycloak
     spec:
+      volumes:
+        - name: realm-import
+          configMap:
+            name: keycloak-realm
       containers:
         - name: keycloak
           image: ${ECR_REGISTRY}/asms/keycloak:24.0.5
-          args: ["start-dev"]
+          args: ["start-dev", "--import-realm"]
           ports:
             - containerPort: 8080
           env:
@@ -230,6 +234,10 @@ spec:
               value: "false"
             - name: KC_HTTP_ENABLED
               value: "true"
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
           resources:
             requests:
               memory: "512Mi"
