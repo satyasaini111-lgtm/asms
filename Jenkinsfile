@@ -197,10 +197,22 @@ pipeline {
                         kubectl rollout status statefulset/kafka -n ${K8S_NAMESPACE} --timeout=300s
 
                         # Apply all service deployments with image substitution
+                        # Retry up to 3 times on transient EKS API server timeouts
+                        apply_with_retry() {
+                            local file="\$1"
+                            for attempt in 1 2 3; do
+                                sed -e 's|\${ECR_REGISTRY}|${ECR_REGISTRY}|g' \
+                                    -e 's|\${IMAGE_TAG}|${IMAGE_TAG}|g' "\$file" | \
+                                kubectl apply --request-timeout=60s -f - && return 0
+                                echo "kubectl apply failed for \$file (attempt \$attempt/3), retrying in 15s..."
+                                sleep 15
+                            done
+                            echo "ERROR: failed to apply \$file after 3 attempts"
+                            return 1
+                        }
+
                         for f in k8s/base/*-deployment.yaml; do
-                            sed -e 's|\${ECR_REGISTRY}|${ECR_REGISTRY}|g' \
-                                -e 's|\${IMAGE_TAG}|${IMAGE_TAG}|g' "\$f" | \
-                            kubectl apply -f -
+                            apply_with_retry "\$f"
                         done
 
                         kubectl apply -f k8s/base/ingressclass.yaml
