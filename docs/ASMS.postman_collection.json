@@ -1,8 +1,8 @@
 {
   "info": {
     "name": "ASMS - Apartment Service Management System",
-    "_postman_id": "asms-api-collection-v1",
-    "description": "Complete API collection for the ASMS microservices platform.\n\n## Base URL\nSet the `baseUrl` variable to your ALB URL.\nDefault: `http://k8s-asmsprod-asmsingr-7dc3e4d184-282727532.us-east-1.elb.amazonaws.com`\n\n## Getting a Token\nRun **00 - Auth → Get Token** directly in Postman. Keycloak is exposed through the ALB at `/realms/*`.\n\nThe token is auto-saved to `{{token}}` by the test script — no kubectl needed.\n\nAvailable test users (all password `Test@1234`):\n- `testuser` — ADMIN\n- `rwa.member` — RWA_MEMBER\n- `resident` — OWNER\n- `security.guard` — SECURITY\n\n## Roles\n- `ADMIN` / `RWA_MEMBER` — management endpoints (list users, manage tickets, etc.)\n- `OWNER` / `TENANT` — resident actions (raise ticket, make payment, approve visitor)\n- `SECURITY` — log and control visitor entry\n- `SUPPORT_STAFF` — resolve support tickets\n- `VENDOR` — vendor operations\n\n## Enum Values\n**UserRole:** ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF\n**AmenityType:** SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER\n**TicketCategory:** PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\n**TicketPriority:** P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW\n**PaymentMethod:** UPI, CARD, NET_BANKING, WALLET, CASH\n**InvoiceType:** MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\n**WorkflowType:** VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING",
+    "_postman_id": "asms-api-collection-v2",
+    "description": "Complete API collection for the ASMS microservices platform.\n\n## Base URL\nSet the `baseUrl` variable to your ALB URL.\nDefault: `http://k8s-asmsprod-asmsingr-7dc3e4d184-282727532.us-east-1.elb.amazonaws.com`\n\n## Quick Start\n1. Run **00 - Auth → Get Token (ADMIN)** to populate `{{adminToken}}` and `{{token}}`\n2. Run **Get Token (OWNER)** to populate `{{ownerToken}}`\n3. Run **Get Token (SECURITY)** to populate `{{securityToken}}`\n4. Each request automatically uses the correct role token via per-request auth override\n\n## Available Test Users (all password `Test@1234`)\n| Username | Role | Token Variable |\n|---|---|---|\n| `testuser` | ADMIN | `{{adminToken}}` |\n| `rwa.member` | RWA_MEMBER | `{{rwaMemberToken}}` |\n| `resident` | OWNER | `{{ownerToken}}` |\n| `security.guard` | SECURITY | `{{securityToken}}` |\n\n## Role Requirements per Endpoint\n- **ADMIN / RWA_MEMBER**: create amenity, list users, manage tickets, list visitors\n- **OWNER / TENANT**: create ticket, initiate payment, book amenity, approve/reject visitor\n- **SECURITY**: log visitor, check-in/out visitor\n- **Any auth**: create user (no auth), helpbot (no auth), get amenity by ID\n\n## Enum Values\n**UserRole:** ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF\n**AmenityType:** SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER\n**TicketCategory:** PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\n**TicketPriority:** P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW\n**PaymentMethod:** UPI, CARD, NET_BANKING, WALLET, CASH\n**InvoiceType:** MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\n**WorkflowType:** VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -25,7 +25,31 @@
       "key": "token",
       "value": "",
       "type": "string",
-      "description": "JWT Bearer token from Keycloak. Obtain via kubectl exec (see collection description)."
+      "description": "Default JWT token (ADMIN role). Set by Get Token (ADMIN)."
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string",
+      "description": "ADMIN role token (testuser). Used by: Create Amenity, List Users, manage tickets."
+    },
+    {
+      "key": "ownerToken",
+      "value": "",
+      "type": "string",
+      "description": "OWNER role token (resident). Used by: Create Ticket, Initiate Payment, Approve/Reject Visitor, Create Booking."
+    },
+    {
+      "key": "securityToken",
+      "value": "",
+      "type": "string",
+      "description": "SECURITY role token (security.guard). Used by: Log Visitor Entry, Check In/Out Visitor."
+    },
+    {
+      "key": "rwaMemberToken",
+      "value": "",
+      "type": "string",
+      "description": "RWA_MEMBER role token (rwa.member). Used by: Assign Ticket, Resolve Ticket, List Users."
     },
     {
       "key": "societyId",
@@ -84,10 +108,10 @@
   "item": [
     {
       "name": "00 - Auth",
-      "description": "Keycloak token operations. Token must be obtained via kubectl exec since Keycloak is not exposed externally.",
+      "description": "Keycloak token operations. Keycloak is exposed through the ALB at /realms/*.\n\nRun each 'Get Token' request for the role you need, then use role-specific endpoints.\nTokens are saved to both {{token}} (default) and the role-specific variable.",
       "item": [
         {
-          "name": "Get Token",
+          "name": "Get Token (ADMIN - testuser)",
           "event": [
             {
               "listen": "test",
@@ -95,8 +119,9 @@
                 "exec": [
                   "const json = pm.response.json();",
                   "if (json.access_token) {",
+                  "    pm.collectionVariables.set('adminToken', json.access_token);",
                   "    pm.collectionVariables.set('token', json.access_token);",
-                  "    console.log('Token saved. Expires in:', json.expires_in, 'seconds');",
+                  "    console.log('ADMIN token saved. Expires in:', json.expires_in, 'seconds');",
                   "} else {",
                   "    console.error('No access_token in response:', JSON.stringify(json));",
                   "}"
@@ -125,14 +150,140 @@
               "host": ["{{baseUrl}}"],
               "path": ["realms", "asms", "protocol", "openid-connect", "token"]
             },
-            "description": "Keycloak is exposed through the ALB at /realms/*.\n\nThe token is auto-saved to {{token}} by the test script.\n\nSwitch username to test different roles:\n- testuser / Test@1234  → ADMIN\n- rwa.member / Test@1234 → RWA_MEMBER\n- resident / Test@1234  → OWNER\n- security.guard / Test@1234 → SECURITY"
+            "description": "Logs in as `testuser` (ADMIN role).\nSaves token to {{adminToken}} and {{token}}.\n\nUse for: Create Amenity, List Users, Assign/Resolve/Close Ticket, List Visitors."
+          }
+        },
+        {
+          "name": "Get Token (OWNER - resident)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('ownerToken', json.access_token);",
+                  "    console.log('OWNER token saved. Expires in:', json.expires_in, 'seconds');",
+                  "} else {",
+                  "    console.error('No access_token in response:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "client_id",  "value": "asms-client",    "type": "text" },
+                { "key": "username",   "value": "resident",        "type": "text" },
+                { "key": "password",   "value": "Test@1234",       "type": "text" },
+                { "key": "grant_type", "value": "password",        "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/realms/asms/protocol/openid-connect/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["realms", "asms", "protocol", "openid-connect", "token"]
+            },
+            "description": "Logs in as `resident` (OWNER role).\nSaves token to {{ownerToken}}.\n\nUse for: Create Ticket, Initiate Payment, My Payments, Create Booking, Approve/Reject Visitor."
+          }
+        },
+        {
+          "name": "Get Token (SECURITY - security.guard)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('securityToken', json.access_token);",
+                  "    console.log('SECURITY token saved. Expires in:', json.expires_in, 'seconds');",
+                  "} else {",
+                  "    console.error('No access_token in response:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "client_id",  "value": "asms-client",       "type": "text" },
+                { "key": "username",   "value": "security.guard",     "type": "text" },
+                { "key": "password",   "value": "Test@1234",          "type": "text" },
+                { "key": "grant_type", "value": "password",           "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/realms/asms/protocol/openid-connect/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["realms", "asms", "protocol", "openid-connect", "token"]
+            },
+            "description": "Logs in as `security.guard` (SECURITY role).\nSaves token to {{securityToken}}.\n\nUse for: Log Visitor Entry, Check In Visitor, Check Out Visitor."
+          }
+        },
+        {
+          "name": "Get Token (RWA_MEMBER - rwa.member)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('rwaMemberToken', json.access_token);",
+                  "    console.log('RWA_MEMBER token saved. Expires in:', json.expires_in, 'seconds');",
+                  "} else {",
+                  "    console.error('No access_token in response:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "client_id",  "value": "asms-client",    "type": "text" },
+                { "key": "username",   "value": "rwa.member",      "type": "text" },
+                { "key": "password",   "value": "Test@1234",       "type": "text" },
+                { "key": "grant_type", "value": "password",        "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/realms/asms/protocol/openid-connect/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["realms", "asms", "protocol", "openid-connect", "token"]
+            },
+            "description": "Logs in as `rwa.member` (RWA_MEMBER role).\nSaves token to {{rwaMemberToken}}.\n\nUse for: List Users, Assign/Resolve/Close Ticket, List Visitors, List Amenities."
           }
         }
       ]
     },
     {
       "name": "01 - Users",
-      "description": "User registration and management. POST (create) has no auth. All GET/PATCH/DELETE require a valid JWT.",
+      "description": "User registration and management.\n\nPOST (create) requires no auth.\nGET list requires ADMIN or RWA_MEMBER.\nGET by ID requires any authenticated role.",
       "item": [
         {
           "name": "Create User",
@@ -165,7 +316,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "users"]
             },
-            "description": "No auth required. Valid roles: ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF"
+            "description": "No auth required. Saves userId to {{userId}}.\n\nValid roles: ADMIN, RWA_MEMBER, OWNER, TENANT, VENDOR, SECURITY, SUPPORT_STAFF"
           }
         },
         {
@@ -178,12 +329,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "users", "{{userId}}"]
             },
-            "description": "Requires any authenticated role."
+            "description": "Requires any authenticated role. Uses {{token}} (ADMIN by default)."
           }
         },
         {
           "name": "List Users",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -198,7 +353,7 @@
                 { "key": "size",   "value": "20" }
               ]
             },
-            "description": "Requires ADMIN or RWA_MEMBER role."
+            "description": "Requires ADMIN or RWA_MEMBER role. Uses {{adminToken}}."
           }
         },
         {
@@ -222,6 +377,10 @@
         {
           "name": "Delete User",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "DELETE",
             "header": [],
             "url": {
@@ -229,14 +388,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "users", "{{userId}}"]
             },
-            "description": "Requires ADMIN role. GDPR erasure — permanently removes user data."
+            "description": "Requires ADMIN role. Uses {{adminToken}}. GDPR erasure — permanently removes user data."
           }
         }
       ]
     },
     {
       "name": "02 - Amenities",
-      "description": "Amenity and booking management (swimming pool, gym, clubhouse, etc.)",
+      "description": "Amenity and booking management (swimming pool, gym, clubhouse, etc.)\n\nCreate/Update/Delete: ADMIN or RWA_MEMBER\nGet/List: any authenticated role\nCreate Booking: OWNER or TENANT",
       "item": [
         {
           "name": "Create Amenity",
@@ -256,6 +415,10 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -268,7 +431,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "amenities"]
             },
-            "description": "AmenityType enum: SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER"
+            "description": "Requires ADMIN or RWA_MEMBER role. Uses {{adminToken}}.\nSaves amenityId to {{amenityId}}.\n\nAmenityType enum: SWIMMING_POOL, GYM, CLUBHOUSE, TENNIS_COURT, BADMINTON_COURT, BANQUET_HALL, LIBRARY, KIDS_PLAY_AREA, TERRACE, OTHER"
           }
         },
         {
@@ -280,7 +443,8 @@
               "raw": "{{baseUrl}}/api/v1/amenities/{{amenityId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "amenities", "{{amenityId}}"]
-            }
+            },
+            "description": "Any authenticated role."
           }
         },
         {
@@ -297,12 +461,17 @@
                 { "key": "page", "value": "0" },
                 { "key": "size", "value": "20" }
               ]
-            }
+            },
+            "description": "Any authenticated role."
           }
         },
         {
           "name": "Update Amenity",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "PUT",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -314,12 +483,17 @@
               "raw": "{{baseUrl}}/api/v1/amenities/{{amenityId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "amenities", "{{amenityId}}"]
-            }
+            },
+            "description": "Requires ADMIN or RWA_MEMBER role. Uses {{adminToken}}."
           }
         },
         {
           "name": "Deactivate Amenity",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "DELETE",
             "header": [],
             "url": {
@@ -327,7 +501,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "amenities", "{{amenityId}}"]
             },
-            "description": "Soft-deactivates the amenity (does not hard-delete)."
+            "description": "Soft-deactivates the amenity. Requires ADMIN or RWA_MEMBER role. Uses {{adminToken}}."
           }
         },
         {
@@ -348,6 +522,10 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -360,7 +538,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "bookings"]
             },
-            "description": "slotStart and slotEnd must be ISO-8601 Instant (UTC). Overlapping slots return 409 Conflict."
+            "description": "Requires OWNER or TENANT role. Uses {{ownerToken}}.\nSaves bookingId to {{bookingId}}.\n\nslotStart and slotEnd must be ISO-8601 UTC. Overlapping slots return 409 Conflict."
           }
         },
         {
@@ -378,6 +556,10 @@
         {
           "name": "List Bookings by User",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -389,12 +571,17 @@
                 { "key": "page", "value": "0" },
                 { "key": "size", "value": "20" }
               ]
-            }
+            },
+            "description": "Requires OWNER or TENANT role. Uses {{ownerToken}}."
           }
         },
         {
           "name": "Cancel Booking",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "DELETE",
             "header": [],
             "url": {
@@ -402,14 +589,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "bookings", "{{bookingId}}"]
             },
-            "description": "Returns the booking with status CANCELLED."
+            "description": "Returns the booking with status CANCELLED. Requires OWNER or TENANT role. Uses {{ownerToken}}."
           }
         }
       ]
     },
     {
       "name": "03 - Support Tickets",
-      "description": "Support ticket lifecycle: raise → assign → resolve → close",
+      "description": "Support ticket lifecycle: raise → assign → resolve → close\n\nCreate: OWNER or TENANT (use {{ownerToken}})\nGet/List: ADMIN, RWA_MEMBER, SUPPORT_STAFF, OWNER, TENANT\nAssign/Resolve/Close: ADMIN or RWA_MEMBER (use {{adminToken}})",
       "item": [
         {
           "name": "Create Ticket",
@@ -429,6 +616,10 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -441,7 +632,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "tickets"]
             },
-            "description": "Requires OWNER or TENANT role.\nCategory: PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\nPriority: P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW"
+            "description": "Requires OWNER or TENANT role. Uses {{ownerToken}}.\nSaves ticketId to {{ticketId}}.\n\nCategory: PLUMBING, ELECTRICAL, CARPENTRY, HOUSEKEEPING, SECURITY, LIFT, WATER_SUPPLY, INTERNET, PARKING, COMMON_AREA, OTHER\nPriority: P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW\n\nNOTE: Using ADMIN token here returns 403 (endpoint is resident-only by design)."
           }
         },
         {
@@ -460,6 +651,10 @@
         {
           "name": "List Tickets",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -473,12 +668,16 @@
                 { "key": "size", "value": "20" }
               ]
             },
-            "description": "Requires ADMIN, RWA_MEMBER, SUPPORT_STAFF, OWNER, or TENANT role. Results are filtered by role."
+            "description": "Requires ADMIN, RWA_MEMBER, SUPPORT_STAFF, OWNER, or TENANT. Uses {{adminToken}}.\nResults are filtered by role — OWNER/TENANT see only their own tickets."
           }
         },
         {
           "name": "Assign Ticket",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -489,12 +688,16 @@
                 { "key": "assignedToUserId", "value": "{{userId}}" }
               ]
             },
-            "description": "Requires ADMIN or RWA_MEMBER role. Assigns ticket to a SUPPORT_STAFF user."
+            "description": "Requires ADMIN or RWA_MEMBER role. Uses {{adminToken}}.\nAssigns ticket to a SUPPORT_STAFF user."
           }
         },
         {
           "name": "Resolve Ticket",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -505,12 +708,16 @@
                 { "key": "resolutionNote", "value": "Plumber fixed the pipe. Issue resolved." }
               ]
             },
-            "description": "Requires ADMIN, RWA_MEMBER, or SUPPORT_STAFF role."
+            "description": "Requires ADMIN, RWA_MEMBER, or SUPPORT_STAFF role. Uses {{adminToken}}."
           }
         },
         {
           "name": "Close Ticket",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -518,14 +725,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "tickets", "{{ticketId}}", "close"]
             },
-            "description": "Requires ADMIN or RWA_MEMBER role. Ticket must be in RESOLVED state first."
+            "description": "Requires ADMIN or RWA_MEMBER role. Uses {{adminToken}}.\nTicket must be in RESOLVED state first."
           }
         }
       ]
     },
     {
       "name": "04 - Visitors",
-      "description": "Visitor entry lifecycle: log → approve/reject (resident) → check-in → check-out (security)",
+      "description": "Visitor entry lifecycle: log (SECURITY) → approve/reject (OWNER) → check-in → check-out (SECURITY)\n\nLog/Check-In/Check-Out: SECURITY role (use {{securityToken}})\nApprove/Reject: OWNER or TENANT (use {{ownerToken}})\nList: ADMIN, RWA_MEMBER, or SECURITY (use {{adminToken}} or {{securityToken}})",
       "item": [
         {
           "name": "Log Visitor Entry",
@@ -545,6 +752,10 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{securityToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -557,12 +768,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "visitors"]
             },
-            "description": "Requires SECURITY role. Security guard logs the visitor at the gate."
+            "description": "Requires SECURITY role. Uses {{securityToken}}.\nSaves visitorId to {{visitorId}}.\n\nField notes:\n- visitorPhone: 10-13 digits\n- residentUserId: the flat owner/tenant being visited (use {{userId}} from Create User)"
           }
         },
         {
           "name": "Approve Visitor",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -570,12 +785,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "visitors", "{{visitorId}}", "approve"]
             },
-            "description": "Requires OWNER or TENANT role. Resident approves the visitor entry."
+            "description": "Requires OWNER or TENANT role. Uses {{ownerToken}}.\nResident approves the visitor entry."
           }
         },
         {
           "name": "Reject Visitor",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -583,12 +802,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "visitors", "{{visitorId}}", "reject"]
             },
-            "description": "Requires OWNER or TENANT role. Resident rejects the visitor entry."
+            "description": "Requires OWNER or TENANT role. Uses {{ownerToken}}.\nResident rejects the visitor entry."
           }
         },
         {
           "name": "Check In Visitor",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{securityToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -596,12 +819,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "visitors", "{{visitorId}}", "checkin"]
             },
-            "description": "Requires SECURITY role. Must be APPROVED first."
+            "description": "Requires SECURITY role. Uses {{securityToken}}.\nVisitor must be in APPROVED state first."
           }
         },
         {
           "name": "Check Out Visitor",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{securityToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -609,12 +836,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "visitors", "{{visitorId}}", "checkout"]
             },
-            "description": "Requires SECURITY role. Records visitor departure time."
+            "description": "Requires SECURITY role. Uses {{securityToken}}.\nRecords visitor departure time."
           }
         },
         {
           "name": "List Visitors by Society",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -627,14 +858,14 @@
                 { "key": "size", "value": "20" }
               ]
             },
-            "description": "Requires ADMIN, RWA_MEMBER, or SECURITY role."
+            "description": "Requires ADMIN, RWA_MEMBER, or SECURITY role. Uses {{adminToken}}."
           }
         }
       ]
     },
     {
       "name": "05 - Payments",
-      "description": "Payment processing — UPI, Card, Net Banking, Wallet, Cash",
+      "description": "Payment processing — UPI, Card, Net Banking, Wallet, Cash\n\nCreate/My Payments: OWNER or TENANT (use {{ownerToken}})\nGet by ID: ADMIN, RWA_MEMBER, OWNER, or TENANT",
       "item": [
         {
           "name": "Initiate Payment",
@@ -654,6 +885,10 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -666,7 +901,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "payments"]
             },
-            "description": "Requires OWNER or TENANT role.\nPaymentMethod: UPI, CARD, NET_BANKING, WALLET, CASH\nreferenceType examples: INVOICE, AMENITY_BOOKING"
+            "description": "Requires OWNER or TENANT role. Uses {{ownerToken}}.\nSaves paymentId to {{paymentId}}.\n\nPaymentMethod: UPI, CARD, NET_BANKING, WALLET, CASH\nreferenceType examples: INVOICE, AMENITY_BOOKING\nreferenceId: ID of the invoice or booking being paid (can be any string if testing standalone)"
           }
         },
         {
@@ -685,6 +920,10 @@
         {
           "name": "My Payments",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{ownerToken}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -696,14 +935,14 @@
                 { "key": "size", "value": "20" }
               ]
             },
-            "description": "Requires OWNER or TENANT role. Returns payments for the authenticated user (X-User-Id header injected by gateway)."
+            "description": "Requires OWNER or TENANT role. Uses {{ownerToken}}.\nReturns payments for the authenticated user (X-User-Id header injected by api-gateway)."
           }
         }
       ]
     },
     {
       "name": "06 - Billing",
-      "description": "Invoice generation and management for maintenance charges, parking, amenities, etc.",
+      "description": "Invoice generation and management for maintenance charges, parking, amenities, etc.\n\nGenerate: ADMIN or RWA_MEMBER\nGet/List: ADMIN, RWA_MEMBER, OWNER, TENANT",
       "item": [
         {
           "name": "Generate Invoice",
@@ -723,6 +962,10 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
@@ -735,7 +978,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "invoices", "generate"]
             },
-            "description": "InvoiceType: MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\nbillingPeriod format: YYYY-MM (e.g., 2026-07)"
+            "description": "Requires ADMIN or RWA_MEMBER role. Uses {{adminToken}}.\nSaves invoiceId to {{invoiceId}} — use this as referenceId in Initiate Payment.\n\nInvoiceType: MONTHLY_MAINTENANCE, AMENITY_BOOKING, WATER_CHARGES, PARKING, PENALTY, AD_HOC\nbillingPeriod format: YYYY-MM"
           }
         },
         {
@@ -769,6 +1012,10 @@
         {
           "name": "List Invoices by Society",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -785,6 +1032,10 @@
         {
           "name": "Mark Invoice Paid",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [],
             "url": {
@@ -792,14 +1043,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "invoices", "{{invoiceId}}", "pay"]
             },
-            "description": "Marks the invoice as PAID. Typically triggered after a successful payment."
+            "description": "Marks the invoice as PAID. Typically triggered after a successful payment. Uses {{adminToken}}."
           }
         }
       ]
     },
     {
       "name": "07 - Workflows",
-      "description": "Multi-stage approval workflows using Chain of Responsibility pattern",
+      "description": "Multi-stage approval workflows using Chain of Responsibility pattern.\n\nSubmit: any authenticated role\nProcess/Reject: ADMIN or RWA_MEMBER\nApproval chain: Security → RWA → Admin",
       "item": [
         {
           "name": "Submit Approval Request",
@@ -831,7 +1082,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "workflows"]
             },
-            "description": "WorkflowType: VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING\nProcessed through Chain of Responsibility: Security → RWA → Admin"
+            "description": "Any authenticated role.\nSaves workflowId to {{workflowId}}.\n\nWorkflowType: VENDOR_ONBOARDING, MAINTENANCE_REQUEST, LEASE_RENEWAL, CONSTRUCTION_PERMIT, FACILITY_BOOKING\nProcessed through Chain of Responsibility: Security → RWA → Admin"
           }
         },
         {
@@ -865,6 +1116,10 @@
         {
           "name": "List Workflows by Society",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -877,12 +1132,16 @@
                 { "key": "size", "value": "20" }
               ]
             },
-            "description": "ApprovalStatus: PENDING, APPROVED, REJECTED"
+            "description": "ApprovalStatus: PENDING, APPROVED, REJECTED. Uses {{adminToken}}."
           }
         },
         {
           "name": "Process (Approve) Workflow",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [],
             "url": {
@@ -890,12 +1149,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "workflows", "{{workflowId}}", "process"]
             },
-            "description": "Advances the workflow through the approval chain (Security → RWA → Admin). Call multiple times to progress through stages."
+            "description": "Advances the workflow through the approval chain. Uses {{adminToken}}.\nCall multiple times to progress through stages: Security → RWA → Admin."
           }
         },
         {
           "name": "Reject Workflow",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [],
             "url": {
@@ -905,7 +1168,8 @@
               "query": [
                 { "key": "reason", "value": "Budget not approved for Q3" }
               ]
-            }
+            },
+            "description": "Uses {{adminToken}}."
           }
         }
       ]
@@ -928,7 +1192,7 @@
                 { "key": "query", "value": "How do I raise a maintenance request?" }
               ]
             },
-            "description": "Try: 'How do I pay maintenance?', 'What amenities are available?', 'How to register a visitor?'"
+            "description": "No auth required.\nTry: 'How do I pay maintenance?', 'What amenities are available?', 'How to register a visitor?', 'What are the gym timings?'"
           }
         },
         {
@@ -946,7 +1210,8 @@
               "raw": "{{baseUrl}}/api/v1/helpbot/ask",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "helpbot", "ask"]
-            }
+            },
+            "description": "No auth required."
           }
         }
       ]
